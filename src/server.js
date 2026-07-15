@@ -45,13 +45,22 @@ const SETUP_PASSWORD = process.env.SETUP_PASSWORD?.trim();
 
 // Gateway admin token (protects OpenClaw gateway + Control UI).
 // Must be stable across restarts. If not provided via env, persist it in the state dir.
+const GATEWAY_TOKEN_PATH = path.join(STATE_DIR, "gateway.token");
+
 function resolveGatewayToken() {
   const envTok = process.env.OPENCLAW_GATEWAY_TOKEN?.trim();
-  if (envTok) return envTok;
+  if (envTok) {
+    try {
+      fs.mkdirSync(STATE_DIR, { recursive: true });
+      fs.writeFileSync(GATEWAY_TOKEN_PATH, envTok, { encoding: "utf8", mode: 0o600 });
+    } catch {
+      // best-effort; startup still has the environment value
+    }
+    return envTok;
+  }
 
-  const tokenPath = path.join(STATE_DIR, "gateway.token");
   try {
-    const existing = fs.readFileSync(tokenPath, "utf8").trim();
+    const existing = fs.readFileSync(GATEWAY_TOKEN_PATH, "utf8").trim();
     if (existing) return existing;
   } catch {
     // ignore
@@ -60,7 +69,7 @@ function resolveGatewayToken() {
   const generated = crypto.randomBytes(32).toString("hex");
   try {
     fs.mkdirSync(STATE_DIR, { recursive: true });
-    fs.writeFileSync(tokenPath, generated, { encoding: "utf8", mode: 0o600 });
+    fs.writeFileSync(GATEWAY_TOKEN_PATH, generated, { encoding: "utf8", mode: 0o600 });
   } catch {
     // best-effort
   }
@@ -70,13 +79,14 @@ function resolveGatewayToken() {
 const OPENCLAW_GATEWAY_TOKEN = resolveGatewayToken();
 process.env.OPENCLAW_GATEWAY_TOKEN = OPENCLAW_GATEWAY_TOKEN;
 const GATEWAY_TOKEN_SECRET_PROVIDER = Object.freeze({
-  source: "env",
-  allowlist: ["OPENCLAW_GATEWAY_TOKEN"],
+  source: "file",
+  path: GATEWAY_TOKEN_PATH,
+  mode: "singleValue",
 });
 const GATEWAY_TOKEN_REF = Object.freeze({
-  source: "env",
-  provider: "railway",
-  id: "OPENCLAW_GATEWAY_TOKEN",
+  source: "file",
+  provider: "gateway_token_file",
+  id: "value",
 });
 
 // Where the gateway will listen internally (we proxy to it).
@@ -751,7 +761,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
   // Optional setup (only after successful onboarding).
   if (ok) {
-    // Ensure the gateway token is referenced from the wrapper environment so the browser UI can
+    // Ensure the gateway token is referenced from its mode-0600 state file so the browser UI can
     // authenticate reliably without persisting the token in plaintext OpenClaw config.
     // (We also enforce loopback bind since the wrapper proxies externally.)
     // IMPORTANT: Set both gateway.auth.token (server-side) and gateway.remote.token (client-side)
@@ -763,7 +773,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         "config",
         "set",
         "--json",
-        "secrets.providers.railway",
+        "secrets.providers.gateway_token_file",
         JSON.stringify(GATEWAY_TOKEN_SECRET_PROVIDER),
       ]),
     );
@@ -1462,7 +1472,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   }
 
   // Sync gateway token SecretRefs on every startup. This prevents token mismatches when the
-  // Railway variable changes without copying the credential into plaintext OpenClaw config.
+  // source value changes without copying the credential into plaintext OpenClaw config.
   if (isConfigured() && OPENCLAW_GATEWAY_TOKEN) {
     console.log("[wrapper] syncing gateway token references in config...");
     try {
@@ -1473,7 +1483,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
           "config",
           "set",
           "--json",
-          "secrets.providers.railway",
+          "secrets.providers.gateway_token_file",
           JSON.stringify(GATEWAY_TOKEN_SECRET_PROVIDER),
         ]),
       );
