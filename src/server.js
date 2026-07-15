@@ -75,8 +75,12 @@ const INTERNAL_GATEWAY_PORT = Number.parseInt(process.env.INTERNAL_GATEWAY_PORT 
 const INTERNAL_GATEWAY_HOST = process.env.INTERNAL_GATEWAY_HOST ?? "127.0.0.1";
 const GATEWAY_TARGET = `http://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}`;
 
-// Always run the built-from-source CLI entry directly to avoid PATH/global-install mismatches.
-const OPENCLAW_ENTRY = process.env.OPENCLAW_ENTRY?.trim() || "/openclaw/dist/entry.js";
+// Run the package-managed copy on the persistent Railway volume directly. This
+// avoids PATH ambiguity while allowing `openclaw update` to persist across
+// container restarts without a mutable/dirty Git checkout.
+const OPENCLAW_ENTRY =
+  process.env.OPENCLAW_ENTRY?.trim() ||
+  "/data/npm/lib/node_modules/openclaw/openclaw.mjs";
 const OPENCLAW_NODE = process.env.OPENCLAW_NODE?.trim() || "node";
 
 function clawArgs(args) {
