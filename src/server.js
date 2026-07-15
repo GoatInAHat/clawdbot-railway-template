@@ -69,6 +69,15 @@ function resolveGatewayToken() {
 
 const OPENCLAW_GATEWAY_TOKEN = resolveGatewayToken();
 process.env.OPENCLAW_GATEWAY_TOKEN = OPENCLAW_GATEWAY_TOKEN;
+const GATEWAY_TOKEN_SECRET_PROVIDER = Object.freeze({
+  source: "env",
+  allowlist: ["OPENCLAW_GATEWAY_TOKEN"],
+});
+const GATEWAY_TOKEN_REF = Object.freeze({
+  source: "env",
+  provider: "railway",
+  id: "OPENCLAW_GATEWAY_TOKEN",
+});
 
 // Where the gateway will listen internally (we proxy to it).
 const INTERNAL_GATEWAY_PORT = Number.parseInt(process.env.INTERNAL_GATEWAY_PORT ?? "18789", 10);
@@ -742,13 +751,30 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
   // Optional setup (only after successful onboarding).
   if (ok) {
-    // Ensure gateway token is written into config so the browser UI can authenticate reliably.
+    // Ensure the gateway token is referenced from the wrapper environment so the browser UI can
+    // authenticate reliably without persisting the token in plaintext OpenClaw config.
     // (We also enforce loopback bind since the wrapper proxies externally.)
     // IMPORTANT: Set both gateway.auth.token (server-side) and gateway.remote.token (client-side)
     // to the same value so the Control UI can connect without "token mismatch" errors.
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
+    await runCmd(
+      OPENCLAW_NODE,
+      clawArgs([
+        "config",
+        "set",
+        "--json",
+        "secrets.providers.railway",
+        JSON.stringify(GATEWAY_TOKEN_SECRET_PROVIDER),
+      ]),
+    );
+    await runCmd(
+      OPENCLAW_NODE,
+      clawArgs(["config", "set", "--json", "gateway.auth.token", JSON.stringify(GATEWAY_TOKEN_REF)]),
+    );
+    await runCmd(
+      OPENCLAW_NODE,
+      clawArgs(["config", "set", "--json", "gateway.remote.token", JSON.stringify(GATEWAY_TOKEN_REF)]),
+    );
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
 
@@ -1435,16 +1461,31 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     }
   }
 
-  // Sync gateway tokens in config with the current env var on every startup.
-  // This prevents "gateway token mismatch" when OPENCLAW_GATEWAY_TOKEN changes
-  // (e.g. Railway variable update) but the config file still has the old value.
+  // Sync gateway token SecretRefs on every startup. This prevents token mismatches when the
+  // Railway variable changes without copying the credential into plaintext OpenClaw config.
   if (isConfigured() && OPENCLAW_GATEWAY_TOKEN) {
-    console.log("[wrapper] syncing gateway tokens in config...");
+    console.log("[wrapper] syncing gateway token references in config...");
     try {
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
-      console.log("[wrapper] gateway tokens synced");
+      await runCmd(
+        OPENCLAW_NODE,
+        clawArgs([
+          "config",
+          "set",
+          "--json",
+          "secrets.providers.railway",
+          JSON.stringify(GATEWAY_TOKEN_SECRET_PROVIDER),
+        ]),
+      );
+      await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["config", "set", "--json", "gateway.auth.token", JSON.stringify(GATEWAY_TOKEN_REF)]),
+      );
+      await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["config", "set", "--json", "gateway.remote.token", JSON.stringify(GATEWAY_TOKEN_REF)]),
+      );
+      console.log("[wrapper] gateway token references synced");
     } catch (err) {
       console.warn(`[wrapper] failed to sync gateway tokens: ${String(err)}`);
     }
