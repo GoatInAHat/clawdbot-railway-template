@@ -94,6 +94,14 @@ const INTERNAL_GATEWAY_PORT = Number.parseInt(process.env.INTERNAL_GATEWAY_PORT 
 const INTERNAL_GATEWAY_HOST = process.env.INTERNAL_GATEWAY_HOST ?? "127.0.0.1";
 const GATEWAY_TARGET = `http://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}`;
 
+// The voice-call plugin owns a separate HTTP/WebSocket listener inside the
+// Gateway process. Railway exposes only this wrapper's PORT, so requests under
+// /voice must be forwarded to the plugin without dashboard authentication.
+// Provider signature verification remains enforced by the plugin.
+const VOICE_CALL_PORT = Number.parseInt(process.env.VOICE_CALL_PORT ?? "3334", 10);
+const VOICE_CALL_HOST = process.env.VOICE_CALL_HOST ?? "127.0.0.1";
+const VOICE_CALL_TARGET = `http://${VOICE_CALL_HOST}:${VOICE_CALL_PORT}`;
+
 // Run the package-managed copy on the persistent Railway volume directly. This
 // avoids PATH ambiguity while allowing `openclaw update` to persist across
 // container restarts without a mutable/dirty Git checkout.
@@ -1356,16 +1364,40 @@ const proxy = httpProxy.createProxyServer({
   xfwd: true,
 });
 
-proxy.on("error", (err, _req, res) => {
-  console.error("[proxy]", err);
+const voiceCallProxy = httpProxy.createProxyServer({
+  target: VOICE_CALL_TARGET,
+  ws: true,
+  xfwd: true,
+});
+
+function handleProxyError(label, err, res) {
+  console.error(`[${label}]`, err);
   try {
     if (res && typeof res.writeHead === "function" && !res.headersSent) {
       res.writeHead(502, { "Content-Type": "text/plain" });
-      res.end("Gateway unavailable\n");
+      res.end(`${label === "voice-proxy" ? "Voice service" : "Gateway"} unavailable\n`);
     }
   } catch {
     // ignore
   }
+}
+
+proxy.on("error", (err, _req, res) => handleProxyError("proxy", err, res));
+voiceCallProxy.on("error", (err, _req, res) =>
+  handleProxyError("voice-proxy", err, res),
+);
+
+function isVoiceCallPath(req) {
+  const url = req?.url || "";
+  return url === "/voice" || url.startsWith("/voice/");
+}
+
+// Twilio/Telnyx/Plivo cannot provide the dashboard's Basic auth. Route carrier
+// webhooks directly to the voice-call plugin; it authenticates them using the
+// provider signature before reading or acting on the body.
+app.use((req, res, next) => {
+  if (!isVoiceCallPath(req)) return next();
+  return voiceCallProxy.web(req, res, { target: VOICE_CALL_TARGET });
 });
 
 // --- Dashboard password protection ---
@@ -1518,6 +1550,11 @@ server.on("upgrade", async (req, socket, head) => {
   // Note: browsers cannot attach arbitrary HTTP headers (including Authorization: Basic)
   // in WebSocket handshakes. Do not enforce dashboard Basic auth at the upgrade layer.
   // The gateway authenticates at the protocol layer and we inject the gateway token below.
+
+  if (isVoiceCallPath(req)) {
+    voiceCallProxy.ws(req, socket, head, { target: VOICE_CALL_TARGET });
+    return;
+  }
 
   if (!isConfigured()) {
     socket.destroy();
