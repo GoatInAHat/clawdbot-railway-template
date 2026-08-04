@@ -159,6 +159,7 @@ function isConfigured() {
 
 let gatewayProc = null;
 let gatewayStarting = null;
+let gatewayStopping = null;
 
 // Debug breadcrumbs for common Railway failures (502 / "Application failed to respond").
 let lastGatewayError = null;
@@ -195,6 +196,9 @@ async function waitForGatewayReady(opts = {}) {
 }
 
 async function startGateway() {
+  if (gatewayStopping) {
+    await gatewayStopping;
+  }
   if (gatewayProc) return;
   if (!isConfigured()) throw new Error("Gateway cannot start: not configured");
 
@@ -214,7 +218,7 @@ async function startGateway() {
     OPENCLAW_GATEWAY_TOKEN,
   ];
 
-  gatewayProc = childProcess.spawn(OPENCLAW_NODE, clawArgs(args), {
+  const child = childProcess.spawn(OPENCLAW_NODE, clawArgs(args), {
     stdio: "inherit",
     env: {
       ...process.env,
@@ -222,19 +226,20 @@ async function startGateway() {
       OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
     },
   });
+  gatewayProc = child;
 
-  gatewayProc.on("error", (err) => {
+  child.on("error", (err) => {
     const msg = `[gateway] spawn error: ${String(err)}`;
     console.error(msg);
     lastGatewayError = msg;
-    gatewayProc = null;
+    if (gatewayProc === child) gatewayProc = null;
   });
 
-  gatewayProc.on("exit", (code, signal) => {
+  child.on("exit", (code, signal) => {
     const msg = `[gateway] exited code=${code} signal=${signal}`;
     console.error(msg);
     lastGatewayExit = { code, signal, at: new Date().toISOString() };
-    gatewayProc = null;
+    if (gatewayProc === child) gatewayProc = null;
   });
 }
 
@@ -281,16 +286,37 @@ async function ensureGatewayRunning() {
 }
 
 async function restartGateway() {
-  if (gatewayProc) {
-    try {
-      gatewayProc.kill("SIGTERM");
-    } catch {
-      // ignore
-    }
-    // Give it a moment to exit and release the port.
-    await sleep(750);
-    gatewayProc = null;
+  if (!gatewayStopping) {
+    const child = gatewayProc;
+    gatewayStopping = (async () => {
+      if (!child) return;
+
+      const exited = new Promise((resolve) => child.once("exit", () => resolve(true)));
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        // The process may already have exited.
+      }
+
+      const stoppedGracefully = await Promise.race([
+        exited,
+        sleep(20_000).then(() => false),
+      ]);
+      if (!stoppedGracefully) {
+        console.warn("[gateway] graceful shutdown timed out; forcing process exit");
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          // The process may already have exited.
+        }
+        await Promise.race([exited, sleep(5_000)]);
+      }
+      if (gatewayProc === child) gatewayProc = null;
+    })().finally(() => {
+      gatewayStopping = null;
+    });
   }
+  await gatewayStopping;
   return ensureGatewayRunning();
 }
 
