@@ -24,6 +24,8 @@ if (process.argv.includes("--version")) {
   const countPath = path.join(state, "codex-install-count");
   const count = Number(fs.existsSync(countPath) ? fs.readFileSync(countPath, "utf8") : "0");
   fs.writeFileSync(countPath, String(count + 1));
+} else if (process.argv.includes("plugins") && process.argv.includes("list")) {
+  console.log(JSON.stringify({ plugins: [{ id: "codex", enabled: true, status: "loaded" }] }));
 } else {
   process.exitCode = 2;
 }

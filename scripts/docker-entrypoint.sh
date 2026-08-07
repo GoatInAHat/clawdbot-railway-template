@@ -80,8 +80,19 @@ install_codex_seed() {
   echo "[bootstrap] installing image-pinned Codex provider for $seed_id"
   OPENCLAW_STATE_DIR="$state_dir" node "$runtime_entry" plugins install --force \
     "npm-pack:$codex_seed"
-  if [[ ! -f "$state_dir/extensions/codex/openclaw.plugin.json" ]]; then
-    echo "[bootstrap] Codex provider install did not produce the expected extension" >&2
+  if ! OPENCLAW_STATE_DIR="$state_dir" node "$runtime_entry" plugins list --json 2>/dev/null | \
+    node -e '
+      let input = "";
+      process.stdin.on("data", (chunk) => { input += chunk; });
+      process.stdin.on("end", () => {
+        const parsed = JSON.parse(input);
+        const plugins = Array.isArray(parsed) ? parsed : (parsed.plugins ?? []);
+        const codex = plugins.find((plugin) => plugin.id === "codex");
+        process.exit(codex?.enabled === true && codex?.status === "loaded" ? 0 : 1);
+      });
+    '
+  then
+    echo "[bootstrap] Codex provider did not load after installation" >&2
     exit 1
   fi
   write_marker "$codex_id_file"
