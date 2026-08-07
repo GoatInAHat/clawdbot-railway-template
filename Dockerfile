@@ -66,6 +66,7 @@ COPY --from=openclaw-source /opt/openclaw-seed /opt/openclaw-seed
 COPY --from=openclaw-source /opt/openclaw-codex.tgz /opt/openclaw-codex.tgz
 COPY --from=openclaw-source /opt/openclaw-discord.tgz /opt/openclaw-discord.tgz
 COPY scripts/docker-entrypoint.sh /usr/local/bin/openclaw-railway-entrypoint
+COPY scripts/repair-stale-auth-order.mjs /usr/local/lib/openclaw/repair-stale-auth-order.mjs
 COPY scripts/patch-memory-tencentdb.mjs /usr/local/lib/openclaw/patch-memory-tencentdb.mjs
 RUN chmod +x /usr/local/bin/openclaw-railway-entrypoint
 
