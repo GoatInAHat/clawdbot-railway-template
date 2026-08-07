@@ -78,8 +78,12 @@ install_codex_seed() {
   fi
 
   echo "[bootstrap] installing image-pinned Codex provider for $seed_id"
-  OPENCLAW_STATE_DIR="$state_dir" node "$runtime_entry" plugins install --force \
+  if ! OPENCLAW_STATE_DIR="$state_dir" node "$runtime_entry" plugins install --force \
     "npm-pack:$codex_seed"
+  then
+    echo "[bootstrap] Codex provider install deferred until the persisted config is valid" >&2
+    return 0
+  fi
   if ! OPENCLAW_STATE_DIR="$state_dir" node "$runtime_entry" plugins list --json 2>/dev/null | \
     node -e '
       let input = "";
@@ -92,8 +96,8 @@ install_codex_seed() {
       });
     '
   then
-    echo "[bootstrap] Codex provider did not load after installation" >&2
-    exit 1
+    echo "[bootstrap] Codex provider validation deferred until the persisted config is valid" >&2
+    return 0
   fi
   write_marker "$codex_id_file"
 }
