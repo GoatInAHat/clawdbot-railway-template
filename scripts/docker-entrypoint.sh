@@ -10,7 +10,7 @@ seed_entry="$seed_package/openclaw.mjs"
 seed_id_file="$seed_root/.openclaw-seed-id"
 runtime_id_file="$runtime_root/.openclaw-seed-id"
 codex_seed=${OPENCLAW_CODEX_SEED_TARBALL:-/opt/openclaw-codex.tgz}
-codex_id_file="$runtime_root/.openclaw-codex-seed-id"
+discord_seed=${OPENCLAW_DISCORD_SEED_TARBALL:-/opt/openclaw-discord.tgz}
 state_dir=${OPENCLAW_STATE_DIR:-${HOME}/.openclaw}
 
 if [[ "$runtime_root" != /* || "$runtime_root" == / ]]; then
@@ -71,17 +71,20 @@ replace_runtime() {
   write_marker "$runtime_id_file"
 }
 
-install_codex_seed() {
-  [[ -f "$codex_seed" ]] || return 0
-  if [[ -f "$codex_id_file" ]] && [[ "$(head -n 1 "$codex_id_file")" == "$seed_id" ]]; then
+install_plugin_seed() {
+  local plugin_id=$1
+  local plugin_seed=$2
+  local plugin_id_file="$runtime_root/.openclaw-${plugin_id}-seed-id"
+  [[ -f "$plugin_seed" ]] || return 0
+  if [[ -f "$plugin_id_file" ]] && [[ "$(head -n 1 "$plugin_id_file")" == "$seed_id" ]]; then
     return 0
   fi
 
-  echo "[bootstrap] installing image-pinned Codex provider for $seed_id"
+  echo "[bootstrap] installing image-pinned $plugin_id plugin for $seed_id"
   if ! OPENCLAW_STATE_DIR="$state_dir" node "$runtime_entry" plugins install --force \
-    "npm-pack:$codex_seed"
+    "npm-pack:$plugin_seed"
   then
-    echo "[bootstrap] Codex provider install deferred until the persisted config is valid" >&2
+    echo "[bootstrap] $plugin_id plugin install deferred until the persisted config is valid" >&2
     return 0
   fi
   if ! OPENCLAW_STATE_DIR="$state_dir" node "$runtime_entry" plugins list --json 2>/dev/null | \
@@ -91,15 +94,15 @@ install_codex_seed() {
       process.stdin.on("end", () => {
         const parsed = JSON.parse(input);
         const plugins = Array.isArray(parsed) ? parsed : (parsed.plugins ?? []);
-        const codex = plugins.find((plugin) => plugin.id === "codex");
-        process.exit(codex?.enabled === true && codex?.status === "loaded" ? 0 : 1);
+        const installed = plugins.find((plugin) => plugin.id === process.argv[1]);
+        process.exit(installed?.enabled === true && installed?.status === "loaded" ? 0 : 1);
       });
-    '
+    ' "$plugin_id"
   then
-    echo "[bootstrap] Codex provider validation deferred until the persisted config is valid" >&2
+    echo "[bootstrap] $plugin_id plugin validation deferred until the persisted config is valid" >&2
     return 0
   fi
-  write_marker "$codex_id_file"
+  write_marker "$plugin_id_file"
 }
 
 if [[ ! -f "$runtime_entry" ]]; then
@@ -121,6 +124,7 @@ if [[ ! -f "$runtime_id_file" ]] || [[ "$(head -n 1 "$runtime_id_file")" != "$se
   replace_runtime
 fi
 
-install_codex_seed
+install_plugin_seed discord "$discord_seed"
+install_plugin_seed codex "$codex_seed"
 
 exec "$@"

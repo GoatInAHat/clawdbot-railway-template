@@ -25,12 +25,14 @@ RUN node scripts/package-openclaw-for-docker.mjs \
   && npm install --global --prefix /opt/openclaw-seed --omit=dev \
       /opt/openclaw-package/openclaw.tgz \
   && /opt/openclaw-seed/bin/openclaw --version
-RUN mkdir -p /opt/openclaw-codex-package \
-  && node scripts/lib/plugin-npm-runtime-build.mjs extensions/codex \
-  && node scripts/lib/plugin-npm-package-manifest.mjs --run extensions/codex -- \
-      npm pack --json --ignore-scripts --pack-destination /opt/openclaw-codex-package \
-  && test "$(find /opt/openclaw-codex-package -maxdepth 1 -type f -name '*.tgz' | wc -l)" -eq 1 \
-  && mv /opt/openclaw-codex-package/*.tgz /opt/openclaw-codex.tgz \
+RUN for plugin in codex discord; do \
+      mkdir -p "/opt/openclaw-${plugin}-package"; \
+      node scripts/lib/plugin-npm-runtime-build.mjs "extensions/${plugin}"; \
+      node scripts/lib/plugin-npm-package-manifest.mjs --run "extensions/${plugin}" -- \
+        npm pack --json --ignore-scripts --pack-destination "/opt/openclaw-${plugin}-package"; \
+      test "$(find "/opt/openclaw-${plugin}-package" -maxdepth 1 -type f -name '*.tgz' | wc -l)" -eq 1; \
+      mv "/opt/openclaw-${plugin}-package"/*.tgz "/opt/openclaw-${plugin}.tgz"; \
+    done \
   && printf '%s\n' "openclaw@2026.7.1-2+${OPENCLAW_SOURCE_REF}" \
       > /opt/openclaw-seed/.openclaw-seed-id \
   && npm cache clean --force
@@ -62,6 +64,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=openclaw-source /opt/openclaw-seed /opt/openclaw-seed
 COPY --from=openclaw-source /opt/openclaw-codex.tgz /opt/openclaw-codex.tgz
+COPY --from=openclaw-source /opt/openclaw-discord.tgz /opt/openclaw-discord.tgz
 COPY scripts/docker-entrypoint.sh /usr/local/bin/openclaw-railway-entrypoint
 RUN chmod +x /usr/local/bin/openclaw-railway-entrypoint
 
