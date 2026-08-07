@@ -32,7 +32,7 @@ export function repairStaleCodexAuthBinding(value) {
   return true;
 }
 
-async function repairCodexBindings(stateDir, config) {
+export async function repairCodexBindings(stateDir, config) {
   if (config.auth?.profiles?.[STALE_PROFILE_ID]) {
     return 0;
   }
@@ -58,7 +58,7 @@ async function repairCodexBindings(stateDir, config) {
       .all(STALE_PROFILE_ID);
     const update = database.prepare(
       `UPDATE plugin_state_entries
-          SET value_json = ?, updated_at = ?
+          SET value_json = ?
         WHERE plugin_id = 'codex'
           AND namespace = 'app-server-thread-bindings'
           AND entry_key = ?
@@ -73,7 +73,7 @@ async function repairCodexBindings(stateDir, config) {
           continue;
         }
         repaired += Number(
-          update.run(JSON.stringify(value), Date.now(), row.entry_key, row.value_json).changes,
+          update.run(JSON.stringify(value), row.entry_key, row.value_json).changes,
         );
       }
       database.exec("COMMIT");
