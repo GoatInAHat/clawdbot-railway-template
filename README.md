@@ -36,7 +36,8 @@ Optional:
 - `OPENCLAW_GATEWAY_TOKEN` — if not set, the wrapper generates one (not ideal). In a template, set it using a generated secret.
 
 Notes:
-- This template seeds a released npm version via Docker build arg `OPENCLAW_VERSION`.
+- This deployment builds the stable OpenClaw base plus its reviewed voice patch from the immutable `OPENCLAW_SOURCE_REF` in the Dockerfile.
+- Core and the matching Codex provider carry the same seed identity; a new image atomically replaces only those packages on the persistent volume.
 - The running package lives on the `/data` volume, so `openclaw update` uses package-manager mode and survives restarts and redeploys.
 - No OpenClaw Git checkout is present at runtime, permanently eliminating dirty-working-tree update failures.
 
