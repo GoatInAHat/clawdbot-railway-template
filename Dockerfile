@@ -4,7 +4,7 @@ FROM node:24-bookworm AS openclaw-source
 # from an immutable commit. Codex is an external provider in this release, so
 # its package is built from the same source snapshot and seeded alongside core.
 ARG OPENCLAW_SOURCE_REPOSITORY=https://github.com/GoatInAHat/openclaw.git
-ARG OPENCLAW_SOURCE_REF=51470b67e334051e3846889c156c5bde9c8f3c14
+ARG OPENCLAW_SOURCE_REF=f98a10a75ce26bc544bfa87091dd376ea99afcf2
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git \
   && rm -rf /var/lib/apt/lists/*
