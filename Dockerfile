@@ -42,7 +42,7 @@ RUN for plugin in codex discord; do \
       /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/codex/ \
   && mv /opt/openclaw-codex-deps/node_modules \
       /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/codex/node_modules \
-  && printf '%s\n' "openclaw-source@${OPENCLAW_SOURCE_REF}" \
+  && printf '%s\n' "openclaw-source@${OPENCLAW_SOURCE_REF}+bundled-codex-v1" \
       > /opt/openclaw-seed/.openclaw-seed-id \
   && npm cache clean --force
 RUN OPENCLAW_STATE_DIR=/tmp/openclaw-bundled-plugin-check \
