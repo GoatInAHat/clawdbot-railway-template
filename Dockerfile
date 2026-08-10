@@ -1,10 +1,10 @@
-FROM node:24-bookworm AS openclaw-source
+ARG OPENCLAW_NODE_IMAGE="docker.io/library/node:24-bookworm@sha256:5711a0d445a1af54af9589066c646df387d1831a608226f4cd694fc59e745059"
 
-# Build the latest stable release plus the reviewed native Discord voice patch
-# from an immutable commit. Codex is an external provider in this release, so
-# its package is built from the same source snapshot and seeded alongside core.
+FROM ${OPENCLAW_NODE_IMAGE} AS openclaw-source
+
+# Build the Codex realtime voice PR from its reviewed immutable commit.
 ARG OPENCLAW_SOURCE_REPOSITORY=https://github.com/GoatInAHat/openclaw.git
-ARG OPENCLAW_SOURCE_REF=d4a694b3132822461e049c34e82c280f4f7e3724
+ARG OPENCLAW_SOURCE_REF=e896ec0257958f3679765e33eef9d904f57b01c2
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git \
   && rm -rf /var/lib/apt/lists/*
@@ -33,11 +33,11 @@ RUN for plugin in codex discord; do \
       test "$(find "/opt/openclaw-${plugin}-package" -maxdepth 1 -type f -name '*.tgz' | wc -l)" -eq 1; \
       mv "/opt/openclaw-${plugin}-package"/*.tgz "/opt/openclaw-${plugin}.tgz"; \
     done \
-  && printf '%s\n' "openclaw@2026.7.1-2+${OPENCLAW_SOURCE_REF}" \
+  && printf '%s\n' "openclaw-source@${OPENCLAW_SOURCE_REF}" \
       > /opt/openclaw-seed/.openclaw-seed-id \
   && npm cache clean --force
 
-FROM node:22-bookworm
+FROM ${OPENCLAW_NODE_IMAGE}
 ENV NODE_ENV=production
 
 RUN apt-get update \
@@ -50,7 +50,7 @@ RUN apt-get update \
 
 # Keep package/plugin installs on the Railway volume. A compatible pnpm is also
 # available for OpenClaw-managed plugin operations that need it.
-RUN corepack enable && corepack prepare pnpm@11.2.2 --activate
+RUN corepack enable && corepack prepare pnpm@11.15.1 --activate
 ENV NPM_CONFIG_PREFIX=/data/npm
 ENV NPM_CONFIG_CACHE=/data/npm-cache
 ENV PNPM_HOME=/data/pnpm
