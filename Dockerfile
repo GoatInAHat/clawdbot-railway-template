@@ -33,9 +33,21 @@ RUN for plugin in codex discord; do \
       test "$(find "/opt/openclaw-${plugin}-package" -maxdepth 1 -type f -name '*.tgz' | wc -l)" -eq 1; \
       mv "/opt/openclaw-${plugin}-package"/*.tgz "/opt/openclaw-${plugin}.tgz"; \
     done \
+  && test -f /src/openclaw/dist/extensions/codex/index.js \
+  && mkdir -p /opt/openclaw-codex-deps \
+  && npm install --prefix /opt/openclaw-codex-deps --omit=dev --omit=peer --no-save \
+      /opt/openclaw-codex.tgz \
+  && mkdir -p /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/codex \
+  && cp -a /src/openclaw/dist/extensions/codex/. \
+      /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/codex/ \
+  && mv /opt/openclaw-codex-deps/node_modules \
+      /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/codex/node_modules \
   && printf '%s\n' "openclaw-source@${OPENCLAW_SOURCE_REF}" \
       > /opt/openclaw-seed/.openclaw-seed-id \
   && npm cache clean --force
+RUN OPENCLAW_STATE_DIR=/tmp/openclaw-bundled-plugin-check \
+      /opt/openclaw-seed/bin/openclaw plugins inspect codex --json \
+    | node -e 'let input = ""; process.stdin.on("data", (chunk) => { input += chunk; }); process.stdin.on("end", () => { const inspected = JSON.parse(input); process.exit(inspected.plugin?.origin === "bundled" ? 0 : 1); });'
 
 FROM ${OPENCLAW_NODE_IMAGE}
 ENV NODE_ENV=production
@@ -63,7 +75,6 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=openclaw-source /opt/openclaw-seed /opt/openclaw-seed
-COPY --from=openclaw-source /opt/openclaw-codex.tgz /opt/openclaw-codex.tgz
 COPY --from=openclaw-source /opt/openclaw-discord.tgz /opt/openclaw-discord.tgz
 COPY scripts/docker-entrypoint.sh /usr/local/bin/openclaw-railway-entrypoint
 COPY scripts/repair-stale-auth-order.mjs /usr/local/lib/openclaw/repair-stale-auth-order.mjs

@@ -33,7 +33,7 @@ if (process.argv.includes("--version")) {
   );
 }
 
-test("entrypoint atomically adopts core, Discord, and Codex seeds once", (t) => {
+test("entrypoint atomically adopts the core and Discord seeds once", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-entrypoint-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
@@ -42,21 +42,18 @@ test("entrypoint atomically adopts core, Discord, and Codex seeds once", (t) => 
   const stateDir = path.join(root, "state");
   const seedPackage = path.join(seedRoot, "lib", "node_modules", "openclaw");
   const runtimePackage = path.join(runtimeRoot, "lib", "node_modules", "openclaw");
-  const codexTarball = path.join(root, "codex.tgz");
   const discordTarball = path.join(root, "discord.tgz");
   const seedId = "openclaw@2026.7.1-2+fixture";
 
   writeFakeOpenClaw(seedPackage, "new");
   writeFakeOpenClaw(runtimePackage, "old");
   fs.writeFileSync(path.join(seedRoot, ".openclaw-seed-id"), `${seedId}\n`);
-  fs.writeFileSync(codexTarball, "fixture");
   fs.writeFileSync(discordTarball, "fixture");
 
   const env = {
     ...process.env,
     HOME: root,
     NPM_CONFIG_PREFIX: runtimeRoot,
-    OPENCLAW_CODEX_SEED_TARBALL: codexTarball,
     OPENCLAW_DISCORD_SEED_TARBALL: discordTarball,
     OPENCLAW_SEED_ROOT: seedRoot,
     OPENCLAW_STATE_DIR: stateDir,
@@ -65,9 +62,8 @@ test("entrypoint atomically adopts core, Discord, and Codex seeds once", (t) => 
   assert.equal(first.status, 0, first.stderr || first.stdout);
   assert.equal(fs.readFileSync(path.join(runtimePackage, "generation"), "utf8"), "new\n");
   assert.equal(fs.readFileSync(path.join(runtimeRoot, ".openclaw-seed-id"), "utf8"), `${seedId}\n`);
-  assert.equal(fs.readFileSync(path.join(runtimeRoot, ".openclaw-codex-seed-id"), "utf8"), `${seedId}\n`);
   assert.equal(fs.readFileSync(path.join(runtimeRoot, ".openclaw-discord-seed-id"), "utf8"), `${seedId}\n`);
-  assert.equal(fs.readFileSync(path.join(stateDir, "codex-install-count"), "utf8"), "1");
+  assert.equal(fs.existsSync(path.join(stateDir, "codex-install-count")), false);
   assert.equal(fs.readFileSync(path.join(stateDir, "discord-install-count"), "utf8"), "1");
   assert.deepEqual(
     fs.readdirSync(path.join(runtimeRoot, "lib", "node_modules")).filter((name) =>
@@ -78,6 +74,6 @@ test("entrypoint atomically adopts core, Discord, and Codex seeds once", (t) => 
 
   const second = spawnSync("bash", [entrypoint, "true"], { encoding: "utf8", env });
   assert.equal(second.status, 0, second.stderr || second.stdout);
-  assert.equal(fs.readFileSync(path.join(stateDir, "codex-install-count"), "utf8"), "1");
+  assert.equal(fs.existsSync(path.join(stateDir, "codex-install-count")), false);
   assert.equal(fs.readFileSync(path.join(stateDir, "discord-install-count"), "utf8"), "1");
 });

@@ -9,7 +9,6 @@ seed_package="$seed_root/lib/node_modules/openclaw"
 seed_entry="$seed_package/openclaw.mjs"
 seed_id_file="$seed_root/.openclaw-seed-id"
 runtime_id_file="$runtime_root/.openclaw-seed-id"
-codex_seed=${OPENCLAW_CODEX_SEED_TARBALL:-/opt/openclaw-codex.tgz}
 discord_seed=${OPENCLAW_DISCORD_SEED_TARBALL:-/opt/openclaw-discord.tgz}
 tencent_patch=${OPENCLAW_TENCENT_PATCH_SCRIPT:-/usr/local/lib/openclaw/patch-memory-tencentdb.mjs}
 auth_order_repair=${OPENCLAW_AUTH_ORDER_REPAIR_SCRIPT:-/usr/local/lib/openclaw/repair-stale-auth-order.mjs}
@@ -127,7 +126,6 @@ if [[ ! -f "$runtime_id_file" ]] || [[ "$(head -n 1 "$runtime_id_file")" != "$se
 fi
 
 install_plugin_seed discord "$discord_seed"
-install_plugin_seed codex "$codex_seed"
 
 if [[ -f "$auth_order_repair" ]]; then
   node "$auth_order_repair" "$state_dir"
