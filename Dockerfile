@@ -42,6 +42,15 @@ RUN for plugin in codex discord voice-call; do \
       /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/codex/ \
   && mv /opt/openclaw-codex-deps/node_modules \
       /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/codex/node_modules \
+  && test -f /src/openclaw/dist/extensions/voice-call/index.js \
+  && mkdir -p /opt/openclaw-voice-call-deps \
+  && npm install --prefix /opt/openclaw-voice-call-deps --omit=dev --omit=peer --no-save \
+      /opt/openclaw-voice-call.tgz \
+  && mkdir -p /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/voice-call \
+  && cp -a /src/openclaw/dist/extensions/voice-call/. \
+      /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/voice-call/ \
+  && mv /opt/openclaw-voice-call-deps/node_modules \
+      /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/voice-call/node_modules \
   && printf '%s\n' "openclaw-source@${OPENCLAW_SOURCE_REF}+bundled-codex-v1" \
       > /opt/openclaw-seed/.openclaw-seed-id \
   && npm cache clean --force
@@ -76,7 +85,6 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=openclaw-source /opt/openclaw-seed /opt/openclaw-seed
 COPY --from=openclaw-source /opt/openclaw-discord.tgz /opt/openclaw-discord.tgz
-COPY --from=openclaw-source /opt/openclaw-voice-call.tgz /opt/openclaw-voice-call.tgz
 COPY scripts/docker-entrypoint.sh /usr/local/bin/openclaw-railway-entrypoint
 COPY scripts/repair-stale-auth-order.mjs /usr/local/lib/openclaw/repair-stale-auth-order.mjs
 COPY scripts/patch-memory-tencentdb.mjs /usr/local/lib/openclaw/patch-memory-tencentdb.mjs

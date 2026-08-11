@@ -19,17 +19,13 @@ if (process.argv.includes("--version")) {
 } else if (process.argv.includes("plugins") && process.argv.includes("install")) {
   const state = process.env.OPENCLAW_STATE_DIR;
   const spec = process.argv.at(-1);
-  const plugin = spec.includes("voice-call")
-    ? "voice-call"
-    : spec.includes("discord")
-      ? "discord"
-      : "codex";
+  const plugin = spec.includes("discord") ? "discord" : "codex";
   const countPath = path.join(state, plugin + "-install-count");
   fs.mkdirSync(state, { recursive: true });
   const count = Number(fs.existsSync(countPath) ? fs.readFileSync(countPath, "utf8") : "0");
   fs.writeFileSync(countPath, String(count + 1));
 } else if (process.argv.includes("plugins") && process.argv.includes("list")) {
-  console.log(JSON.stringify({ plugins: ["codex", "discord", "voice-call"].map(id => ({ id, enabled: true, status: "loaded" })) }));
+  console.log(JSON.stringify({ plugins: ["codex", "discord"].map(id => ({ id, enabled: true, status: "loaded" })) }));
 } else {
   process.exitCode = 2;
 }
@@ -37,7 +33,7 @@ if (process.argv.includes("--version")) {
   );
 }
 
-test("entrypoint atomically adopts the core and external plugin seeds once", (t) => {
+test("entrypoint atomically adopts the core and Discord seeds once", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-entrypoint-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
@@ -47,21 +43,18 @@ test("entrypoint atomically adopts the core and external plugin seeds once", (t)
   const seedPackage = path.join(seedRoot, "lib", "node_modules", "openclaw");
   const runtimePackage = path.join(runtimeRoot, "lib", "node_modules", "openclaw");
   const discordTarball = path.join(root, "discord.tgz");
-  const voiceCallTarball = path.join(root, "voice-call.tgz");
   const seedId = "openclaw@2026.7.1-2+fixture";
 
   writeFakeOpenClaw(seedPackage, "new");
   writeFakeOpenClaw(runtimePackage, "old");
   fs.writeFileSync(path.join(seedRoot, ".openclaw-seed-id"), `${seedId}\n`);
   fs.writeFileSync(discordTarball, "fixture");
-  fs.writeFileSync(voiceCallTarball, "fixture");
 
   const env = {
     ...process.env,
     HOME: root,
     NPM_CONFIG_PREFIX: runtimeRoot,
     OPENCLAW_DISCORD_SEED_TARBALL: discordTarball,
-    OPENCLAW_VOICE_CALL_SEED_TARBALL: voiceCallTarball,
     OPENCLAW_SEED_ROOT: seedRoot,
     OPENCLAW_STATE_DIR: stateDir,
   };
@@ -70,13 +63,8 @@ test("entrypoint atomically adopts the core and external plugin seeds once", (t)
   assert.equal(fs.readFileSync(path.join(runtimePackage, "generation"), "utf8"), "new\n");
   assert.equal(fs.readFileSync(path.join(runtimeRoot, ".openclaw-seed-id"), "utf8"), `${seedId}\n`);
   assert.equal(fs.readFileSync(path.join(runtimeRoot, ".openclaw-discord-seed-id"), "utf8"), `${seedId}\n`);
-  assert.equal(
-    fs.readFileSync(path.join(runtimeRoot, ".openclaw-voice-call-seed-id"), "utf8"),
-    `${seedId}\n`,
-  );
   assert.equal(fs.existsSync(path.join(stateDir, "codex-install-count")), false);
   assert.equal(fs.readFileSync(path.join(stateDir, "discord-install-count"), "utf8"), "1");
-  assert.equal(fs.readFileSync(path.join(stateDir, "voice-call-install-count"), "utf8"), "1");
   assert.deepEqual(
     fs.readdirSync(path.join(runtimeRoot, "lib", "node_modules")).filter((name) =>
       name.startsWith("openclaw.previous-"),
@@ -88,5 +76,4 @@ test("entrypoint atomically adopts the core and external plugin seeds once", (t)
   assert.equal(second.status, 0, second.stderr || second.stdout);
   assert.equal(fs.existsSync(path.join(stateDir, "codex-install-count")), false);
   assert.equal(fs.readFileSync(path.join(stateDir, "discord-install-count"), "utf8"), "1");
-  assert.equal(fs.readFileSync(path.join(stateDir, "voice-call-install-count"), "utf8"), "1");
 });
