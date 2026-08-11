@@ -93,6 +93,15 @@ const GATEWAY_TOKEN_REF = Object.freeze({
 const INTERNAL_GATEWAY_PORT = Number.parseInt(process.env.INTERNAL_GATEWAY_PORT ?? "18789", 10);
 const INTERNAL_GATEWAY_HOST = process.env.INTERNAL_GATEWAY_HOST ?? "127.0.0.1";
 const GATEWAY_TARGET = `http://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}`;
+const INTERNAL_VOICE_CALL_PORT = Number.parseInt(
+  process.env.INTERNAL_VOICE_CALL_PORT ?? "3334",
+  10,
+);
+const VOICE_CALL_TARGET = `http://127.0.0.1:${INTERNAL_VOICE_CALL_PORT}`;
+
+function proxyTargetForPath(pathname) {
+  return pathname.startsWith("/voice/") ? VOICE_CALL_TARGET : GATEWAY_TARGET;
+}
 
 // Run the package-managed copy on the persistent Railway volume directly. This
 // avoids PATH ambiguity while allowing `openclaw update` to persist across
@@ -1419,7 +1428,7 @@ app.use(async (req, res) => {
     }
   }
 
-  return proxy.web(req, res, { target: GATEWAY_TARGET });
+  return proxy.web(req, res, { target: proxyTargetForPath(req.path) });
 });
 
 const server = app.listen(PORT, "0.0.0.0", async () => {
@@ -1516,7 +1525,8 @@ server.on("upgrade", async (req, socket, head) => {
     socket.destroy();
     return;
   }
-  proxy.ws(req, socket, head, { target: GATEWAY_TARGET });
+  const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+  proxy.ws(req, socket, head, { target: proxyTargetForPath(pathname) });
 });
 
 process.on("SIGTERM", () => {

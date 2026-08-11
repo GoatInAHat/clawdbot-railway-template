@@ -14,3 +14,12 @@ test("ws upgrade handler does not enforce Basic auth (browsers can't send header
   assert.doesNotMatch(window, /scheme === "Basic"/);
   assert.doesNotMatch(window, /WWW-Authenticate/);
 });
+
+test("voice-call webhook and media paths stay on the loopback voice server", () => {
+  const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+
+  assert.match(src, /VOICE_CALL_TARGET = `http:\/\/127\.0\.0\.1:\$\{INTERNAL_VOICE_CALL_PORT\}`/);
+  assert.match(src, /pathname\.startsWith\("\/voice\/"\)/);
+  assert.match(src, /proxy\.web\(req, res, \{ target: proxyTargetForPath\(req\.path\) \}\)/);
+  assert.match(src, /proxy\.ws\(req, socket, head, \{ target: proxyTargetForPath\(pathname\) \}\)/);
+});
