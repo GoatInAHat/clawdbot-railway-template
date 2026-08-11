@@ -51,12 +51,14 @@ RUN for plugin in codex discord voice-call; do \
       /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/voice-call/ \
   && mv /opt/openclaw-voice-call-deps/node_modules \
       /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/voice-call/node_modules \
-  && printf '%s\n' "openclaw-source@${OPENCLAW_SOURCE_REF}+bundled-codex-v1" \
+  && printf '%s\n' "openclaw-source@${OPENCLAW_SOURCE_REF}+bundled-codex-voice-call-v1" \
       > /opt/openclaw-seed/.openclaw-seed-id \
   && npm cache clean --force
-RUN OPENCLAW_STATE_DIR=/tmp/openclaw-bundled-plugin-check \
-      /opt/openclaw-seed/bin/openclaw plugins inspect codex --json \
-    | node -e 'let input = ""; process.stdin.on("data", (chunk) => { input += chunk; }); process.stdin.on("end", () => { const inspected = JSON.parse(input); process.exit(inspected.plugin?.origin === "bundled" ? 0 : 1); });'
+RUN for plugin in codex voice-call; do \
+      OPENCLAW_STATE_DIR=/tmp/openclaw-bundled-plugin-check \
+        /opt/openclaw-seed/bin/openclaw plugins inspect "$plugin" --json \
+      | node -e 'let input = ""; process.stdin.on("data", (chunk) => { input += chunk; }); process.stdin.on("end", () => { const inspected = JSON.parse(input); process.exit(inspected.plugin?.origin === "bundled" ? 0 : 1); });'; \
+    done
 
 FROM ${OPENCLAW_NODE_IMAGE}
 ENV NODE_ENV=production
