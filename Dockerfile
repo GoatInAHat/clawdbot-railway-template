@@ -4,7 +4,7 @@ FROM ${OPENCLAW_NODE_IMAGE} AS openclaw-source
 
 # Build the Codex realtime voice PR from its reviewed immutable commit.
 ARG OPENCLAW_SOURCE_REPOSITORY=https://github.com/GoatInAHat/openclaw.git
-ARG OPENCLAW_SOURCE_REF=80795a6d368d5c903fdbf39a03266aca9ffd47bc
+ARG OPENCLAW_SOURCE_REF=d34eb7d87e54df56f2358d5e08b95b15b930c81f
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git \
   && rm -rf /var/lib/apt/lists/*
@@ -51,7 +51,7 @@ RUN for plugin in codex discord voice-call; do \
       /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/voice-call/ \
   && mv /opt/openclaw-voice-call-deps/node_modules \
       /opt/openclaw-seed/lib/node_modules/openclaw/dist/extensions/voice-call/node_modules \
-  && printf '%s\n' "openclaw-source@${OPENCLAW_SOURCE_REF}+bundled-codex-voice-call-v2" \
+  && printf '%s\n' "openclaw-source@${OPENCLAW_SOURCE_REF}+bundled-codex-voice-call-v3" \
       > /opt/openclaw-seed/.openclaw-seed-id \
   && npm cache clean --force
 RUN for plugin in codex voice-call; do \
