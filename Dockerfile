@@ -25,7 +25,7 @@ RUN node scripts/package-openclaw-for-docker.mjs \
   && npm install --global --prefix /opt/openclaw-seed --omit=dev \
       /opt/openclaw-package/openclaw.tgz \
   && /opt/openclaw-seed/bin/openclaw --version
-RUN for plugin in codex discord; do \
+RUN for plugin in codex discord voice-call; do \
       mkdir -p "/opt/openclaw-${plugin}-package"; \
       node scripts/lib/plugin-npm-runtime-build.mjs "extensions/${plugin}"; \
       node scripts/lib/plugin-npm-package-manifest.mjs --run "extensions/${plugin}" -- \
@@ -76,6 +76,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=openclaw-source /opt/openclaw-seed /opt/openclaw-seed
 COPY --from=openclaw-source /opt/openclaw-discord.tgz /opt/openclaw-discord.tgz
+COPY --from=openclaw-source /opt/openclaw-voice-call.tgz /opt/openclaw-voice-call.tgz
 COPY scripts/docker-entrypoint.sh /usr/local/bin/openclaw-railway-entrypoint
 COPY scripts/repair-stale-auth-order.mjs /usr/local/lib/openclaw/repair-stale-auth-order.mjs
 COPY scripts/patch-memory-tencentdb.mjs /usr/local/lib/openclaw/patch-memory-tencentdb.mjs
