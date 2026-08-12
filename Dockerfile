@@ -4,7 +4,7 @@ FROM ${OPENCLAW_NODE_IMAGE} AS openclaw-source
 
 # Build the Codex realtime voice PR from its reviewed immutable commit.
 ARG OPENCLAW_SOURCE_REPOSITORY=https://github.com/GoatInAHat/openclaw.git
-ARG OPENCLAW_SOURCE_REF=ae310e18ce0dfa0b0d47526110723e31cf2a2689
+ARG OPENCLAW_SOURCE_REF=773225784220f651df9d65c9ba4cb3506028af4c
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git \
   && rm -rf /var/lib/apt/lists/*
