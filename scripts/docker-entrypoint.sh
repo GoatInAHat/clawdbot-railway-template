@@ -31,6 +31,43 @@ if [[ -z "$seed_id" ]]; then
   exit 1
 fi
 
+# Preserve the persisted files that this release transition may update. The
+# workspace, sessions, media, and every other state path remain in place and
+# are never copied, moved, or deleted by the bootstrap process.
+backup_id=${seed_id//[^a-zA-Z0-9._-]/_}
+backup_root="${runtime_root%/npm}/openclaw-backups/pre-${backup_id}"
+if [[ ! -f "$backup_root/.complete" ]]; then
+  backup_stage="${backup_root}.tmp-$$"
+  mkdir -p "$backup_stage/state" "$backup_stage/runtime"
+  for relative in \
+    openclaw.json \
+    state/openclaw.sqlite \
+    state/openclaw.sqlite-shm \
+    state/openclaw.sqlite-wal \
+    agents/main/agent/codex-home/auth.json \
+    agents/main/agent/auth-profiles.json \
+    extensions/codex \
+    extensions/discord
+  do
+    if [[ -e "$state_dir/$relative" || -L "$state_dir/$relative" ]]; then
+      mkdir -p "$backup_stage/state/$(dirname "$relative")"
+      cp -a "$state_dir/$relative" "$backup_stage/state/$relative"
+    fi
+  done
+  for marker in \
+    .openclaw-seed-id \
+    .openclaw-codex-seed-id \
+    .openclaw-discord-seed-id
+  do
+    if [[ -e "$runtime_root/$marker" || -L "$runtime_root/$marker" ]]; then
+      cp -a "$runtime_root/$marker" "$backup_stage/runtime/$marker"
+    fi
+  done
+  printf '%s\n' "$seed_id" > "$backup_stage/.complete"
+  mv "$backup_stage" "$backup_root"
+  echo "[bootstrap] preserved pre-upgrade state in $backup_root"
+fi
+
 write_marker() {
   local target=$1
   local temporary="${target}.tmp-$$"
